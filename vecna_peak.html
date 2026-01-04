@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Topology of the UpsideDown</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; background-color: #0f0f0f; color: #e0e0e0; margin: 0; overflow: hidden; }
+        .ui { background: #1a1a1a; padding: 15px 25px; border-bottom: 3px solid #d41d1d; position: relative; z-index: 10; display: flex; justify-content: space-between; align-items: center;}
+        h1 { color: #d41d1d; text-shadow: 2px 2px #000; margin: 0; font-size: 1.6em; letter-spacing: 1px;}
+        h2 { color: #888; font-size: 0.9em; margin: 5px 0 0 0; }
+        #plot { width: 100vw; height: calc(100vh - 80px); }
+        .controls { display: flex; gap: 20px; align-items: center; }
+        .toggle-group { display: flex; align-items: center; gap: 8px; }
+        label { font-size: 1em; cursor: pointer; color: #bbb; }
+        input[type="checkbox"] { transform: scale(1.4); cursor: pointer; accent-color: #d41d1d; }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        <div>
+            <h1>GO FIND VECNA AT THE SUMMIT OF THE UPSIDEDOWN!</h1>
+            <h2>Target Landscape: z = -3x<sup>4</sup> + 4x<sup>3</sup> + 36x<sup>2</sup> - 12y<sup>2</sup></h2>
+        </div>
+        <div class="controls">
+            <div class="toggle-group">
+                <input type="checkbox" id="showPeaks" onchange="updatePlot()">
+                <label for="showPeaks">Reveal Summits</label>
+            </div>
+            <div class="toggle-group">
+                <input type="checkbox" id="showPath" onchange="updatePlot()">
+                <label for="showPath">Calculate Fastest Route</label>
+            </div>
+        </div>
+    </div>
+
+    <div id="plot"></div>
+
+    <script>
+        function updatePlot() {
+            const showPeaks = document.getElementById('showPeaks').checked;
+            const showPath = document.getElementById('showPath').checked;
+            
+            // --- 1. Generate Surface Data ---
+            // Domain: x from -3.5 to 4.2, y from -3.5 to 3.5
+            let xVals = [];
+            let yVals = [];
+            let zVals = [];
+
+            for (let x = -3.5; x <= 4.2; x += 0.2) xVals.push(x);
+            for (let y = -3.5; y <= 3.5; y += 0.2) yVals.push(y);
+
+            for (let i = 0; i < yVals.length; i++) {
+                let row = [];
+                for (let j = 0; j < xVals.length; j++) {
+                    let x = xVals[j];
+                    let y = yVals[i];
+                    // Function: z = -3x^4 + 4x^3 + 36x^2 - 12y^2
+                    let z = -3*Math.pow(x,4) + 4*Math.pow(x,3) + 36*Math.pow(x,2) - 12*Math.pow(y,2);
+                    
+                    // Cap the Z value at -150 for visibility (the "Abyss")
+                    row.push(Math.max(z, -150)); 
+                }
+                zVals.push(row);
+            }
+
+            const surface = {
+                type: 'surface',
+                x: xVals,
+                y: yVals,
+                z: zVals,
+                colorscale: 'Hot', // Dark/Red theme
+                reversescale: true, // Make peaks bright yellow/white, abyss dark red/black
+                opacity: 0.9,
+                showscale: false,
+                name: 'Terrain',
+                contours: {
+                    z: { show: true, usecolormap: true, highlightcolor: "#42f5e6", project: { z: true } } // Contours on floor
+                }
+            };
+
+            // --- 2. The Gate (Saddle Point at 0,0,0) ---
+            const gate = {
+                type: 'scatter3d',
+                mode: 'markers+text',
+                x: [0], y: [0], z: [5], // Lifted slightly for visibility
+                marker: { color: '#00ccff', size: 8, symbol: 'circle', line: {color: 'white', width: 2} },
+                text: ['THE GATE (Saddle)<br>(0,0)'],
+                textposition: 'bottom center',
+                textfont: { color: '#00ccff', size: 12 },
+                name: 'The Gate'
+            };
+
+            // --- 3. The Summits (Hidden by default) ---
+            // True Summit at (3,0) -> z = 189
+            // False Peak at (-2,0) -> z = 64
+            const peaks = {
+                type: 'scatter3d',
+                mode: 'markers+text',
+                x: [3, -2], 
+                y: [0, 0], 
+                z: [189, 64],
+                marker: { color: ['#00ff00', '#ff00ff'], size: 10, symbol: 'diamond' },
+                text: ['TRUE SUMMIT (Global Max)<br>z=189', 'FALSE PEAK (Local Max)<br>z=64'],
+                textposition: 'top center',
+                textfont: { color: '#ffffff', size: 11 },
+                visible: showPeaks,
+                name: 'Peaks'
+            };
+
+            // --- 4. The Fastest Path (Steepest Ascent) ---
+            // Along y=0 from x=0 to x=3
+            let pathX = [], pathY = [], pathZ = [];
+            if (showPath) {
+                for (let x = 0; x <= 3; x += 0.1) {
+                    pathX.push(x);
+                    pathY.push(0);
+                    pathZ.push(-3*Math.pow(x,4) + 4*Math.pow(x,3) + 36*Math.pow(x,2) + 2); // +2 to float above surface
+                }
+            }
+
+            const path = {
+                type: 'scatter3d',
+                mode: 'lines',
+                x: pathX, y: pathY, z: pathZ,
+                line: { color: 'cyan', width: 8 },
+                name: 'Fastest Route',
+                visible: showPath
+            };
+
+            // --- Plot Configuration ---
+            const data = [surface, gate, peaks, path];
+
+            const layout = {
+                title: false,
+                paper_bgcolor: '#0f0f0f',
+                font: { color: '#ccc', family: 'Courier New' },
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                showlegend: false,
+                scene: {
+                    xaxis: { title: 'X', gridcolor: '#444', zerolinecolor: '#d41d1d' },
+                    yaxis: { title: 'Y', gridcolor: '#444', zerolinecolor: '#d41d1d' },
+                    zaxis: { title: 'Z (Height)', gridcolor: '#444', range: [-100, 250] },
+                    camera: { 
+                        eye: {x: 1.5, y: -1.5, z: 0.8}, // Isometric-ish view
+                        center: {x: 0, y: 0, z: -0.2}
+                    },
+                    aspectratio: { x: 1, y: 1, z: 0.7 }
+                }
+            };
+
+            Plotly.react('plot', data, layout);
+        }
+
+        // Initial Render
+        updatePlot();
+    </script>
+</body>
+</html>

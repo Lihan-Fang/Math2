@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dustin's Gate Optimizer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body { font-family: 'Courier New', Courier, monospace; background-color: #1a1a1a; color: #fff; margin: 0; overflow: hidden; }
+        .ui { background: #222; padding: 20px; border-bottom: 2px solid #d41d1d; position: relative; z-index: 10; }
+        h1 { color: #d41d1d; text-shadow: 2px 2px #000; margin: 0 0 10px 0; font-size: 1.5em; }
+        #plot { width: 100vw; height: calc(100vh - 100px); }
+        .controls { display: flex; align-items: center; gap: 10px; }
+        label { font-size: 1.1em; cursor: pointer; }
+        input[type="checkbox"] { transform: scale(1.5); cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="ui">
+        <h1>Operation: Gate Stabilization</h1>
+        <div class="controls">
+            <input type="checkbox" id="toggleConstraint" onchange="updatePlot()">
+            <label for="toggleConstraint">Show Budget Constraint (4x + 10y = 100)</label>
+        </div>
+    </div>
+
+    <div id="plot"></div>
+
+    <script>
+        function updatePlot() {
+            const isConstrained = document.getElementById('toggleConstraint').checked;
+            
+            // 1. Stability Surface Data
+            let xArr = [], yArr = [], zArr = [];
+            for(let i=0; i<=25; i+=0.5) xArr.push(i);
+            for(let i=0; i<=20; i+=0.5) yArr.push(i);
+            
+            for(let i=0; i<yArr.length; i++) {
+                let row = [];
+                for(let j=0; j<xArr.length; j++) {
+                    let val = 200 - Math.pow(xArr[j]-10, 2) - 2 * Math.pow(yArr[i]-8, 2);
+                    row.push(val < 0 ? 0 : val); // Floor at 0
+                }
+                zArr.push(row);
+            }
+
+            const surfaceTrace = {
+                z: zArr, x: xArr, y: yArr,
+                type: 'surface', colorscale: 'Hot', showscale: false,
+                opacity: 0.7, name: 'Stability Function'
+            };
+
+            // 2. The Budget Wall (Boundary 4x + 10y = 100)
+            let wx = [], wy = [], wz = [];
+            for(let i=0; i<=25; i+=1) {
+                let rowX = [], rowY = [], rowZ = [];
+                let yVal = (100 - 4*i)/10;
+                if (yVal >= 0) {
+                    for(let j=0; j<=200; j+=20) {
+                        rowX.push(i);
+                        rowY.push(yVal);
+                        rowZ.push(j);
+                    }
+                    wx.push(rowX); wy.push(rowY); wz.push(rowZ);
+                }
+            }
+
+            const wallTrace = {
+                x: wx, y: wy, z: wz,
+                type: 'surface', opacity: 0.5,
+                colorscale: [[0, 'red'], [1, 'red']],
+                showscale: false, name: 'Budget Wall',
+                visible: isConstrained // Only visible when checked
+            };
+
+            // 3. The Points
+            
+            // Global Maximum (Always visible for comparison)
+            const idealPoint = {
+                type: 'scatter3d', mode: 'markers+text',
+                x: [10], y: [8], z: [200],
+                marker: { color: 'cyan', size: 8, symbol: 'diamond' },
+                text: ['Ideal Peak (S=200)'], textfont: { color: 'cyan' },
+                visible: true // <--- MODIFIED: Always true
+            };
+
+            // Constrained Maximum (Only visible when constraint is active)
+            const optimalPoint = {
+                type: 'scatter3d', mode: 'markers+text',
+                x: [8.78], y: [6.48], z: [193.89],
+                marker: { color: '#00FF00', size: 10, line: {color: 'white', width: 2} },
+                text: ['Optimal Point (S=193.89)'], textfont: { color: '#00FF00' },
+                visible: isConstrained // <--- Keeps logic: visible only if checked
+            };
+
+            const data = [surfaceTrace, wallTrace, idealPoint, optimalPoint];
+
+            const layout = {
+                scene: {
+                    xaxis: { title: 'Batteries (x)', range: [0, 25] },
+                    yaxis: { title: 'Eggos (y)', range: [0, 20] },
+                    zaxis: { title: 'Stability (S)', range: [0, 210] },
+                    camera: { eye: {x: 1.8, y: 1.8, z: 1.2} }
+                },
+                paper_bgcolor: '#1a1a1a',
+                font: { color: '#ccc' },
+                margin: { l: 0, r: 0, b: 0, t: 0 },
+                showlegend: false
+            };
+
+            Plotly.newPlot('plot', data, layout);
+        }
+
+        updatePlot();
+    </script>
+</body>
+</html>
